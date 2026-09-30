@@ -1,5 +1,10 @@
 {
-  "name": "worktrees",
+  "name": "worktree-tidy",
+  "license": "MIT",
+  "scripts": {
+    "start": "bun run index.ts",
+    "test": "bun test"
+  },
   "private": true,
   "type": "module",
   "dependencies": {

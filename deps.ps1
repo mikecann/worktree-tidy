@@ -1,16 +1,17 @@
-# deps.ps1 for worktrees — ensures Bun deps are installed for this tool.
+# Install the Bun dependencies for worktree-tidy.
+$ErrorActionPreference = 'Stop'
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
-    Write-Host "  [worktrees] bun not found. Install from https://bun.sh then re-run install.ps1." -ForegroundColor Yellow
-    return
+    throw 'Bun not found. Install from https://bun.sh then re-run install.ps1.'
 }
 
-Write-Host "  [worktrees] bun $($(& bun --version | Select-Object -First 1))" -ForegroundColor Green
+Write-Host "  [worktree-tidy] bun $($(& bun --version | Select-Object -First 1))" -ForegroundColor Green
 Push-Location $here
 try {
     bun install
+    if ($LASTEXITCODE -ne 0) { throw "bun install failed with exit code $LASTEXITCODE" }
 } finally {
     Pop-Location
 }

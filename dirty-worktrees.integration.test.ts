@@ -23,7 +23,7 @@ function runGit({ cwd, args }: { cwd: string; args: string[] }): string {
 }
 
 function createRepoWithWorktrees(): { mainPath: string; cleanPath: string; dirtyPath: string } {
-  const root = mkdtempSync(join(tmpdir(), 'worktrees-it-'));
+  const root = mkdtempSync(join(tmpdir(), 'worktree-tidy-it-'));
   tempDirs.push(root);
 
   const mainPath = join(root, 'main');

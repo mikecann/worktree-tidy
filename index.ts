@@ -2,8 +2,8 @@
 // Interactive git worktree manager (macOS + Windows).
 //
 // Usage:
-//   worktrees              # run from any directory inside the repo
-//   worktrees --force      # pass --force to git worktree remove
+//   worktree-tidy              # run from any directory inside the repo
+//   worktree-tidy --force      # pass --force to git worktree remove
 
 import { checkbox, confirm, select } from '@inquirer/prompts';
 import { execFileSync } from 'node:child_process';

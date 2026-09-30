@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - name: Check POSIX scripts
+        if: runner.os != 'Windows'
+        run: bash -n install.sh install-to-path.sh run.sh worktree-tidy
+      - name: Parse PowerShell scripts and check install/uninstall
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git ls-files '*.ps1' | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $_), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count) { throw ($errors | Out-String) }
+          }
+          $toolsDir = Join-Path $env:RUNNER_TEMP 'worktree-tidy tools'
+          .\install.ps1 -ToolsDir $toolsDir
+          .\install.ps1 -ToolsDir $toolsDir -SkipDeps
+          foreach ($name in @('worktree-tidy.bat', 'worktree-tidy')) {
+            if (-not (Test-Path (Join-Path $toolsDir $name))) { throw "Missing $name" }
+          }
+          # Run the installed command in a disposable repo with no linked trees.
+          $repo = Join-Path $env:RUNNER_TEMP 'worktree-tidy smoke'
+          git init --initial-branch=main $repo
+          if ($LASTEXITCODE -ne 0) { throw 'git init failed' }
+          Push-Location $repo
+          try {
+            & (Join-Path $toolsDir 'worktree-tidy.bat')
+            if ($LASTEXITCODE -ne 0) { throw 'Installed command failed' }
+          } finally { Pop-Location }
+          Set-Content (Join-Path $toolsDir 'other-tool.bat') '@echo off'
+          .\uninstall.ps1 -ToolsDir $toolsDir
+          .\uninstall.ps1 -ToolsDir $toolsDir
+          foreach ($name in @('worktree-tidy.bat', 'worktree-tidy')) {
+            if (Test-Path (Join-Path $toolsDir $name)) { throw "Left behind $name" }
+          }
+          if (-not (Test-Path (Join-Path $toolsDir 'other-tool.bat'))) { throw 'Removed another tool' }

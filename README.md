@@ -1,80 +1,119 @@
-![header](docs/header.webp)
+# ![](icons/worktree-tidy.png) worktree-tidy
 
-# ![](icons/worktrees.png) worktrees
+Tidy up the pile of git worktrees your AI agents leave behind
 
-Interactive helper for cleaning up **git worktrees**. I use it when Cursor leaves a pile of linked checkouts under `.cursor/worktrees` and I want to list them, delete a few, or nuke all linked ones without touching the primary checkout.
+Windows · macOS
 
+<!-- media: hero -->
+<!-- ![worktree-tidy](docs/hero.png) -->
+<!-- media: hero -->
 
-## What it does
+![worktree-tidy in a terminal](docs/header.webp)
+
+Previously called `worktrees`.
+
+## What it is
+
+I use this when Cursor leaves a pile of linked checkouts under `.cursor/worktrees`. It lists every worktree in the repo you're in, marks which is the primary and which are linked, and lets you pick some (or all the linked ones) to delete.
+
+It never lets you remove the primary checkout, and it asks before deleting anything. If a worktree has uncommitted changes it shows you the files first, so you don't lose work by accident.
+
+## Get it
+
+Paste this into your AI coding agent (Claude Code, Codex, Cursor...):
+
+> Clone https://github.com/mikecann/worktree-tidy and make it my own. It's one of Mike
+> Cann's personal tools, so read the README first, change anything specific to his
+> setup to suit mine, then help me get it running.
+
+### Or set it up by hand
+
+You'll need [Bun](https://bun.sh) and Git on your PATH. No API keys or `.env` file needed.
+
+```bash
+git clone https://github.com/mikecann/worktree-tidy.git
+cd worktree-tidy
+```
+
+On macOS:
+
+```bash
+bash install.sh
+```
+
+This runs `bun install` and links `worktree-tidy` into `~/.local/bin`. If that folder isn't on your PATH, add this to `~/.zshrc` and open a new terminal:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+You can choose another directory with `bash install.sh /path/to/bin`, or pass `--skip-deps` if dependencies are already installed. `install-to-path.sh` only installs the launcher.
+
+On Windows, from PowerShell:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+This runs `deps.ps1` to install Bun dependencies and writes `worktree-tidy.bat` and a Git Bash wrapper into `C:\dev\tools`. Add that folder to your user PATH in Windows Environment Variables and open a new terminal. You can pass `-ToolsDir 'C:\your\bin'` to use another folder, or `-SkipDeps` to skip dependency installation. Keep the clone's path to ASCII characters because the Windows stub uses ASCII encoding.
+
+The installed command points back to this clone, so code changes take effect immediately. Re-run the installer if you move the clone.
+
+## Using it
+
+From any directory inside the Git checkout you want to tidy:
+
+```bash
+worktree-tidy          # choose linked worktrees to remove
+worktree-tidy --force  # same as -f, passes --force to git worktree remove
+```
+
+Pick selected linked worktrees or all linked worktrees, then confirm. If any are dirty, it shows modified and untracked files and asks for a separate confirmation before force-removing them. `--force` still asks for those confirmations.
+
+There is no non-interactive batch mode. To run without installing a command, first run `bun install` in this clone, then call `bun run /path/to/worktree-tidy/index.ts` from the checkout you want to tidy. On macOS, `bash /path/to/worktree-tidy/run.sh` works too.
+
+## How it works
 
 | Step | Detail |
 |---|---|
-| Detect repo | Uses `git rev-parse --show-toplevel` from your **current directory**, so you must be inside some checkout of that repo (any subfolder is fine). |
-| List | Prints every worktree from `git worktree list --porcelain`, labelled **primary** vs **linked** (linked means the git dir lives under `.git/worktrees/`). |
-| Remove | Only **linked** worktrees are selectable. I never try to remove the primary checkout through this UI. |
-| Confirm | You get a final yes or no before anything is deleted. If a target worktree is dirty, it shows the modified and untracked files first and asks you to confirm deleting those changes. |
+| Detect repo | Uses `git rev-parse --show-toplevel` from your current directory. Any subfolder inside a checkout is fine. |
+| List | Reads `git worktree list --porcelain` and labels checkouts as primary or linked. A linked checkout's Git directory lives under `.git/worktrees/`. |
+| Remove | Only linked worktrees are selectable. Removals run `git worktree remove`. |
+| Confirm | Shows local changes, asks before deleting them, then asks for final confirmation. Confirmed dirty worktrees are removed with `--force`. |
 
-Removals run `git worktree remove`. If a selected worktree has local changes, the tool now shows what would be deleted and, if you confirm, force-removes it. You can still pass **`--force`** (same as `git worktree remove --force`) if you want force mode from the start.
+## Uninstall
 
+On Windows:
 
-## Dependencies
-
-- [Bun](https://bun.sh) on your `PATH`
-- `git`
-- In this repo: run **`bun install`** inside `tools/worktrees` once per clone (or let Windows `install.ps1` run `deps.ps1`, which does that for you).
-
-
-## macOS
-
-1. `cd tools/worktrees && bun install`
-2. Put the launcher on your `PATH` (I use **`~/.local/bin`**, same idea as dropping stubs into a folder that is already on `PATH` on Windows):
-
-   ```bash
-   bash tools/worktrees/install-to-path.sh
-   ```
-
-   That writes a small `worktrees` launcher into `~/.local/bin` pointing back to this checkout's `tools/worktrees/index.ts`. If `worktrees` is not found, add this to `~/.zshrc` and open a new terminal:
-
-   ```bash
-   export PATH="$HOME/.local/bin:$PATH"
-   ```
-
-3. From **any directory inside a checkout** of this repo:
-
-   ```bash
-   worktrees
-   ```
-
-The launcher always runs this checkout's **`tools/worktrees/index.ts`** against whichever git repo you call it from. Code changes in this checkout take effect immediately; rerun `install-to-path.sh` only if you move this repo.
-
-You can still run **`bash tools/worktrees/run.sh`** from the repo root if you prefer not to use `~/.local/bin`.
-
-
-## Windows
-
-1. Run **`install.ps1`** at the repo root (re-run when you add or change tools). That writes **`worktrees.bat`** into `C:\dev\tools` (or whatever your tools dir is) and runs **`tools/worktrees/deps.ps1`** when Bun is installed.
-2. Open a new terminal and run **`worktrees`** from any folder inside a checkout.
-
-
-## Usage
-
-```bash
-worktrees          # normal remove (git may refuse if dirty)
-worktrees --force  # same as -f, passes --force to git worktree remove
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\uninstall.ps1
 ```
 
-There is no non-interactive batch mode. If you need that later, we can add flags.
+Use the same `-ToolsDir` if you chose a custom directory. It removes only this tool's two stubs and leaves the shared directory and PATH alone.
 
+On macOS, remove the installed link:
+
+```bash
+rm "$HOME/.local/bin/worktree-tidy"
+```
 
 ## Tests
 
-From `tools/worktrees`:
+From this clone:
 
 ```bash
+bun install
 bun test
 ```
 
+The integration tests create temporary Git repos and worktrees. The macOS launcher test also checks installation from a path with spaces, argument forwarding, and the caller's working directory.
 
 ## Icon
 
-`icons/worktrees.png` is **`application_view_list.png`** from the [FamFamFam Silk](https://www.famfamfam.com/lab/icons/silk/) set (Mark James, [CC BY 2.5](https://creativecommons.org/licenses/by/2.5/)).
+`icons/worktree-tidy.png` is `application_view_list.png` from the [FamFamFam Silk](https://www.famfamfam.com/lab/icons/silk/) set (Mark James, [CC BY 2.5](https://creativecommons.org/licenses/by/2.5/)). The icon keeps its original licence and credit.
+
+## More tools
+
+You can find my other tools at [mikerosoft.app](https://mikerosoft.app).
+
+MIT licensed.
