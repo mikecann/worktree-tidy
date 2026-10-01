@@ -5,10 +5,10 @@ Tidy up the pile of git worktrees your AI agents leave behind
 Windows · macOS
 
 <!-- media: hero -->
-<!-- ![worktree-tidy](docs/hero.png) -->
-<!-- media: hero -->
+![worktree-tidy listing a repo's worktrees, with two of them picked to remove](docs/picking.png)
 
-![worktree-tidy in a terminal](docs/header.webp)
+[Watch it run (14 seconds)](docs/demo.mp4)
+<!-- /media: hero -->
 
 Previously called `worktrees`.
 
