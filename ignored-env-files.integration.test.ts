@@ -31,7 +31,10 @@ function createRepoWithWorktrees(): { cleanPath: string; envPath: string } {
   const envPath = join(root, 'wt-env');
 
   runGit({ cwd: root, args: ['init', '--initial-branch=main', mainPath] });
-  writeFileSync(join(mainPath, '.gitignore'), '.env*\n.dev.vars\nnode_modules/\n');
+  writeFileSync(
+    join(mainPath, '.gitignore'),
+    ['.env*', '*.env', '.dev.vars', 'node_modules/', '.vercel', 'secrets/', 'debug.log', ''].join('\n'),
+  );
   mkdirSync(join(mainPath, 'apps', 'web'), { recursive: true });
   writeFileSync(join(mainPath, 'apps', 'web', 'page.ts'), 'export {};\n');
   runGit({ cwd: mainPath, args: ['add', '.'] });
@@ -52,15 +55,42 @@ describe('listIgnoredEnvFiles integration', () => {
 
     writeFileSync(join(envPath, '.env.local'), 'TOKEN=test\n');
     writeFileSync(join(envPath, '.dev.vars'), 'TOKEN=test\n');
+    writeFileSync(join(envPath, 'docker.env'), 'TOKEN=test\n');
     writeFileSync(join(envPath, 'apps', 'web', '.env'), 'TOKEN=test\n');
+    // Env files inside a folder that is ignored as a whole still get deleted.
+    // `vercel pull` writes .vercel/.env.development.local, for example.
+    mkdirSync(join(envPath, '.vercel'), { recursive: true });
+    writeFileSync(join(envPath, '.vercel', '.env.development.local'), 'TOKEN=test\n');
+    mkdirSync(join(envPath, 'secrets'), { recursive: true });
+    writeFileSync(join(envPath, 'secrets', '.env'), 'TOKEN=test\n');
+    // Other ignored files aren't env files.
+    writeFileSync(join(envPath, 'debug.log'), '\n');
+    // A Python virtualenv folder called .env/ is not an env file either.
+    mkdirSync(join(envPath, '.env', 'bin'), { recursive: true });
+    writeFileSync(join(envPath, '.env', 'pyvenv.cfg'), '\n');
+    writeFileSync(join(envPath, '.env', 'bin', 'python'), '\n');
     // Files inside an ignored dependency folder are not worth a warning.
     mkdirSync(join(envPath, 'node_modules', 'pkg'), { recursive: true });
     writeFileSync(join(envPath, 'node_modules', 'pkg', '.env'), 'TOKEN=test\n');
+    mkdirSync(join(envPath, 'apps', 'web', 'node_modules', 'pkg'), { recursive: true });
+    writeFileSync(join(envPath, 'apps', 'web', 'node_modules', 'pkg', '.env'), 'TOKEN=test\n');
     mkdirSync(join(cleanPath, 'node_modules'), { recursive: true });
     writeFileSync(join(cleanPath, 'node_modules', 'index.js'), '\n');
 
     const found = listIgnoredEnvFiles({ paths: [cleanPath, envPath] });
-    expect(found).toEqual([{ path: envPath, files: ['.dev.vars', '.env.local', 'apps/web/.env'] }]);
+    expect(found).toEqual([
+      {
+        path: envPath,
+        files: [
+          '.dev.vars',
+          '.env.local',
+          '.vercel/.env.development.local',
+          'apps/web/.env',
+          'docker.env',
+          'secrets/.env',
+        ],
+      },
+    ]);
   });
 
   it('returns an empty list when no worktree has ignored env files', () => {

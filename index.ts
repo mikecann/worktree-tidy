@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 
 import { listDirtyWorktrees } from './dirty-worktrees';
 import { listIgnoredEnvFiles } from './ignored-env-files';
-import { loadWorktreeRows } from './worktree-rows';
+import { loadWorktreeRows, type WorktreeRow } from './worktree-rows';
 
 function exhaustiveCheck(param: never): never {
   throw new Error(`Exhaustive check failed: ${String(param)}`);
@@ -34,8 +34,9 @@ function gitCommonDir(cwd: string): string {
   }).trim();
 }
 
-function formatBranch(branch: string | null): string {
-  if (!branch) return 'detached';
+function formatBranch(row: Pick<WorktreeRow, 'branch' | 'head'>): string {
+  const { branch, head } = row;
+  if (!branch) return head ? `detached at ${head.slice(0, 7)}` : 'detached';
   if (branch.startsWith('refs/heads/')) return branch.slice('refs/heads/'.length);
   return branch;
 }
@@ -75,7 +76,7 @@ async function main(): Promise<void> {
   console.log('Worktrees:');
   for (const row of rows) {
     console.log(`  [${row.kind}] ${row.path}`);
-    console.log(`          ${formatBranch(row.branch)}`);
+    console.log(`          ${formatBranch(row)}`);
     if (row.prunable) console.log(`          ${row.prunable}`);
   }
   console.log('');
@@ -96,7 +97,7 @@ async function main(): Promise<void> {
   }
   if (prunable.length > 0) {
     choices.push({
-      name: `Prune stale worktree records whose folders are gone (${prunable.length})`,
+      name: `Prune stale worktree records (${prunable.length})`,
       value: 'prune',
     });
   }
@@ -107,6 +108,26 @@ async function main(): Promise<void> {
   if (action === 'exit') return;
 
   if (action === 'prune') {
+    console.log('Git will forget these worktrees. Prune never deletes folders:');
+    for (const row of prunable) console.log(`  ${row.path} (${formatBranch(row)})`);
+    if (prunable.some((r) => !r.branch)) {
+      console.log(
+        '\nA detached worktree\'s commit may not be on any branch, and Git can garbage-collect it after pruning.' +
+          '\nTo keep one, run `git branch <name> <commit>` first.',
+      );
+    }
+    console.log('');
+
+    const okPrune = await confirm({
+      message: `Prune ${prunable.length} stale worktree record(s)?`,
+      default: false,
+    });
+
+    if (!okPrune) {
+      console.log('Cancelled.');
+      return;
+    }
+
     pruneWorktrees(topLevel);
     console.log('Done.');
     return;
@@ -118,7 +139,7 @@ async function main(): Promise<void> {
     const picked = await checkbox({
       message: 'Choose worktrees to remove',
       choices: linked.map((r) => ({
-        name: `${r.path} (${formatBranch(r.branch)})`,
+        name: `${r.path} (${formatBranch(r)})`,
         value: r.path,
       })),
       required: true,

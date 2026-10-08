@@ -5,7 +5,7 @@ import { isLinkedWorktreeGitDir, parseWorktreePorcelain, type ParsedWorktree } f
 /**
  * - primary: the main checkout, never removable.
  * - linked: a linked worktree that `git worktree remove` can delete.
- * - prunable: git's record of a worktree whose folder is gone. Only `git worktree prune` cleans it up.
+ * - prunable: git's record of a worktree whose folder (or its .git file) is gone. Only `git worktree prune` cleans it up.
  * - unreadable: any other checkout git can't open (for example a locked worktree on a missing drive).
  */
 export type WorktreeKind = 'primary' | 'linked' | 'prunable' | 'unreadable';

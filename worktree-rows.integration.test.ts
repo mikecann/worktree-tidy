@@ -74,6 +74,6 @@ describe('loadWorktreeRows integration', () => {
       { name: 'wt-1-kept', kind: 'linked' },
       { name: 'wt-2-gone', kind: 'prunable' },
     ]);
-    expect(rows[2]?.prunable).toBeTruthy();
+    expect(rows.find((row) => basename(row.path) === 'wt-2-gone')?.prunable).toBeTruthy();
   });
 });

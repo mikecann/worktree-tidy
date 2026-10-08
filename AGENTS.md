@@ -50,7 +50,8 @@ linked Git worktrees on Windows and macOS.
 - `worktree-rows.ts`: lists worktrees and labels them primary, linked, prunable
   or unreadable.
 - `dirty-worktrees.ts`: modified and untracked file detection.
-- `ignored-env-files.ts`: ignored `.env*` and `.dev.vars*` file detection.
+- `ignored-env-files.ts`: ignored `.env*`, `*.env` and `.dev.vars*` file detection,
+  including inside ignored folders. Don't use `--directory`, which hides them.
 - `*.test.ts`: unit tests and disposable repository/installer integration tests.
 - `worktree-tidy` and `run.sh`: POSIX entry points.
 - `install.ps1`, `uninstall.ps1`, `deps.ps1`: Windows setup.
