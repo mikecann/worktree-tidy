@@ -16,8 +16,8 @@ branch refs/heads/feature
 
     const rows = parseWorktreePorcelain(sample);
     expect(rows).toEqual([
-      { path: '/repo/main', head: 'abcdef', branch: 'refs/heads/main' },
-      { path: '/repo/wt1', head: 'abcdef', branch: 'refs/heads/feature' },
+      { path: '/repo/main', head: 'abcdef', branch: 'refs/heads/main', prunable: null },
+      { path: '/repo/wt1', head: 'abcdef', branch: 'refs/heads/feature', prunable: null },
     ]);
   });
 
@@ -29,7 +29,30 @@ detached
 `.trim();
 
     expect(parseWorktreePorcelain(sample)).toEqual([
-      { path: '/repo/detached', head: 'deadbeef', branch: null },
+      { path: '/repo/detached', head: 'deadbeef', branch: null, prunable: null },
+    ]);
+  });
+
+  it('keeps the reason git gives for a prunable worktree', () => {
+    const sample = `
+worktree /repo/main
+HEAD abcdef
+branch refs/heads/main
+
+worktree /repo/gone
+HEAD abcdef
+branch refs/heads/gone
+prunable gitdir file points to non-existent location
+`.trim();
+
+    expect(parseWorktreePorcelain(sample)).toEqual([
+      { path: '/repo/main', head: 'abcdef', branch: 'refs/heads/main', prunable: null },
+      {
+        path: '/repo/gone',
+        head: 'abcdef',
+        branch: 'refs/heads/gone',
+        prunable: 'gitdir file points to non-existent location',
+      },
     ]);
   });
 });

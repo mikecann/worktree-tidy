@@ -2,6 +2,8 @@ export type ParsedWorktree = {
   path: string;
   head: string;
   branch: string | null;
+  /** Git's reason when the worktree's folder is gone and `git worktree prune` would drop it. */
+  prunable: string | null;
 };
 
 export function parseWorktreePorcelain(output: string): ParsedWorktree[] {
@@ -16,15 +18,19 @@ export function parseWorktreePorcelain(output: string): ParsedWorktree[] {
     let path = '';
     let head = '';
     let branch: string | null = null;
+    let prunable: string | null = null;
 
     for (const line of lines) {
       if (line.startsWith('worktree ')) path = line.slice('worktree '.length).trim();
       else if (line.startsWith('HEAD ')) head = line.slice('HEAD '.length).trim();
       else if (line.startsWith('branch ')) branch = line.slice('branch '.length).trim();
       else if (line === 'detached') branch = null;
+      else if (line === 'prunable' || line.startsWith('prunable ')) {
+        prunable = line.slice('prunable'.length).trim() || 'prunable';
+      }
     }
 
-    if (path) result.push({ path, head, branch });
+    if (path) result.push({ path, head, branch, prunable });
   }
 
   return result;

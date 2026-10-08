@@ -16,7 +16,7 @@ Previously called `worktrees`.
 
 I use this when Cursor leaves a pile of linked checkouts under `.cursor/worktrees`. It lists every worktree in the repo you're in, marks which is the primary and which are linked, and lets you pick some (or all the linked ones) to delete.
 
-It never lets you remove the primary checkout, and it asks before deleting anything. If a worktree has uncommitted changes it shows you the files first, so you don't lose work by accident.
+It never lets you remove the primary checkout, and it asks before deleting anything. If a worktree has uncommitted changes it shows you the files first, so you don't lose work by accident. Ignored env files like `.env.local` get the same treatment, because Git deletes ignored files with the worktree and those often hold keys that only live in that folder.
 
 ## Get it
 
@@ -68,7 +68,9 @@ worktree-tidy          # choose linked worktrees to remove
 worktree-tidy --force  # same as -f, passes --force to git worktree remove
 ```
 
-Pick selected linked worktrees or all linked worktrees, then confirm. If any are dirty, it shows modified and untracked files and asks for a separate confirmation before force-removing them. `--force` still asks for those confirmations.
+Pick selected linked worktrees or all linked worktrees, then confirm. If any are dirty, it shows modified and untracked files and asks for a separate confirmation before force-removing them. If any contain ignored `.env*` or `.dev.vars*` files, it lists those and asks before deleting them too. `--force` still asks for those confirmations.
+
+If you deleted a worktree's folder by hand, Git still remembers it and lists it as prunable. worktree-tidy shows those as `[prunable]` and offers to clean up the stale records with `git worktree prune`.
 
 There is no non-interactive batch mode. To run without installing a command, first run `bun install` in this clone, then call `bun run /path/to/worktree-tidy/index.ts` from the checkout you want to tidy. On macOS, `bash /path/to/worktree-tidy/run.sh` works too.
 
@@ -77,9 +79,10 @@ There is no non-interactive batch mode. To run without installing a command, fir
 | Step | Detail |
 |---|---|
 | Detect repo | Uses `git rev-parse --show-toplevel` from your current directory. Any subfolder inside a checkout is fine. |
-| List | Reads `git worktree list --porcelain` and labels checkouts as primary or linked. A linked checkout's Git directory lives under `.git/worktrees/`. |
+| List | Reads `git worktree list --porcelain` and labels checkouts as primary, linked or prunable. A linked checkout's Git directory lives under `.git/worktrees/`. Prunable ones are records whose folder is already gone. |
 | Remove | Only linked worktrees are selectable. Removals run `git worktree remove`. |
-| Confirm | Shows local changes, asks before deleting them, then asks for final confirmation. Confirmed dirty worktrees are removed with `--force`. |
+| Prune | Offered when Git reports prunable worktrees. Runs `git worktree prune`, which only drops Git's records for folders that no longer exist. |
+| Confirm | Shows local changes and ignored env files, asks before deleting them, then asks for final confirmation. Confirmed dirty worktrees are removed with `--force`. |
 
 ## Uninstall
 
