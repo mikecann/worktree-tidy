@@ -18,6 +18,10 @@ linked Git worktrees on Windows and macOS.
   ignored env files, which `git worktree remove` deletes without asking.
 - Prunable worktrees (folder already gone) must never crash the listing. Don't
   run git inside their path.
+- Locked worktrees are listed but never offered for removal, because
+  `git worktree remove` refuses them and would abort the rest of the batch.
+- Escape control characters with `printable` before printing any path or file
+  name that came from git, so a crafted name can't rewrite a warning.
 - The command must operate on the caller's current directory. Launchers may
   resolve their own path, but must not switch into this clone before running.
 

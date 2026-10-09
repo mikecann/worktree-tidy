@@ -9,6 +9,7 @@ import { checkbox, confirm, select } from '@inquirer/prompts';
 import { execFileSync } from 'node:child_process';
 
 import { listDirtyWorktrees } from './dirty-worktrees';
+import { printable } from './display';
 import { listIgnoredEnvFiles } from './ignored-env-files';
 import { loadWorktreeRows, type WorktreeRow } from './worktree-rows';
 
@@ -75,9 +76,12 @@ async function main(): Promise<void> {
   console.log(`Current checkout: ${topLevel}\n`);
   console.log('Worktrees:');
   for (const row of rows) {
-    console.log(`  [${row.kind}] ${row.path}`);
-    console.log(`          ${formatBranch(row)}`);
-    if (row.prunable) console.log(`          ${row.prunable}`);
+    console.log(`  [${row.kind}] ${printable(row.path)}`);
+    console.log(`          ${printable(formatBranch(row))}`);
+    if (row.prunable) console.log(`          ${printable(row.prunable)}`);
+    if (row.locked) {
+      console.log(`          locked: ${printable(row.locked)}. Run \`git worktree unlock\` on it to make it removable.`);
+    }
   }
   console.log('');
 
@@ -109,7 +113,7 @@ async function main(): Promise<void> {
 
   if (action === 'prune') {
     console.log('Git will forget these worktrees. Prune never deletes folders:');
-    for (const row of prunable) console.log(`  ${row.path} (${formatBranch(row)})`);
+    for (const row of prunable) console.log(`  ${printable(row.path)} (${printable(formatBranch(row))})`);
     if (prunable.some((r) => !r.branch)) {
       console.log(
         '\nA detached worktree\'s commit may not be on any branch, and Git can garbage-collect it after pruning.' +
@@ -139,7 +143,7 @@ async function main(): Promise<void> {
     const picked = await checkbox({
       message: 'Choose worktrees to remove',
       choices: linked.map((r) => ({
-        name: `${r.path} (${formatBranch(r)})`,
+        name: `${printable(r.path)} (${printable(formatBranch(r))})`,
         value: r.path,
       })),
       required: true,
@@ -156,8 +160,8 @@ async function main(): Promise<void> {
   if (dirtyWorktrees.length > 0) {
     console.log('These worktrees have local changes that would be deleted:');
     for (const worktree of dirtyWorktrees) {
-      console.log(`\n${worktree.path}`);
-      for (const change of worktree.changes) console.log(`  ${change}`);
+      console.log(`\n${printable(worktree.path)}`);
+      for (const change of worktree.changes) console.log(`  ${printable(change)}`);
     }
     console.log('');
 
@@ -176,8 +180,8 @@ async function main(): Promise<void> {
   if (envWorktrees.length > 0) {
     console.log('These worktrees have ignored env files that git deletes along with the worktree:');
     for (const worktree of envWorktrees) {
-      console.log(`\n${worktree.path}`);
-      for (const file of worktree.files) console.log(`  ${file}`);
+      console.log(`\n${printable(worktree.path)}`);
+      for (const file of worktree.files) console.log(`  ${printable(file)}`);
     }
     console.log('');
 
@@ -195,7 +199,7 @@ async function main(): Promise<void> {
   const shouldForce = force || dirtyWorktrees.length > 0;
   const forceNote = shouldForce ? 'with --force' : 'without --force';
   const ok = await confirm({
-    message: `Remove ${targets.length} worktree(s) ${forceNote}?\n${targets.join('\n')}`,
+    message: `Remove ${targets.length} worktree(s) ${forceNote}?\n${targets.map(printable).join('\n')}`,
     default: false,
   });
 

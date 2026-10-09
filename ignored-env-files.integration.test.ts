@@ -1,30 +1,12 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 
 import { listIgnoredEnvFiles } from './ignored-env-files';
-
-const tempDirs: string[] = [];
-
-function runGit({ cwd, args }: { cwd: string; args: string[] }): string {
-  return execFileSync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      GIT_AUTHOR_NAME: 'Test User',
-      GIT_AUTHOR_EMAIL: 'test@example.com',
-      GIT_COMMITTER_NAME: 'Test User',
-      GIT_COMMITTER_EMAIL: 'test@example.com',
-    },
-  });
-}
+import { createTempDir, removeTempDirs, runGit } from './test-helpers';
 
 function createRepoWithWorktrees(): { cleanPath: string; envPath: string } {
-  const root = mkdtempSync(join(tmpdir(), 'worktree-tidy-env-'));
-  tempDirs.push(root);
+  const root = createTempDir('worktree-tidy-env-');
 
   const mainPath = join(root, 'main');
   const cleanPath = join(root, 'wt-clean');
@@ -45,9 +27,7 @@ function createRepoWithWorktrees(): { cleanPath: string; envPath: string } {
   return { cleanPath, envPath };
 }
 
-afterEach(() => {
-  for (const tempDir of tempDirs.splice(0, tempDirs.length)) rmSync(tempDir, { force: true, recursive: true });
-});
+afterEach(removeTempDirs);
 
 describe('listIgnoredEnvFiles integration', () => {
   it('returns ignored env files that git worktree remove would delete', () => {
