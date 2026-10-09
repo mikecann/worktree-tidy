@@ -9,7 +9,9 @@ import { checkbox, confirm, select } from '@inquirer/prompts';
 import { execFileSync } from 'node:child_process';
 
 import { listDirtyWorktrees } from './dirty-worktrees';
-import { isLinkedWorktreeGitDir, parseWorktreePorcelain } from './parse-worktrees';
+import { printable } from './display';
+import { listIgnoredEnvFiles } from './ignored-env-files';
+import { loadWorktreeRows, type WorktreeRow } from './worktree-rows';
 
 function exhaustiveCheck(param: never): never {
   throw new Error(`Exhaustive check failed: ${String(param)}`);
@@ -26,13 +28,6 @@ function gitTopLevel(cwd: string): string {
   }).trim();
 }
 
-function gitWorktreePorcelain(cwd: string): string {
-  return execFileSync('git', ['worktree', 'list', '--porcelain'], {
-    encoding: 'utf8',
-    cwd,
-  });
-}
-
 function gitCommonDir(cwd: string): string {
   return execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
     encoding: 'utf8',
@@ -40,15 +35,9 @@ function gitCommonDir(cwd: string): string {
   }).trim();
 }
 
-function gitDirForWorktree(worktreePath: string): string {
-  return execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-dir'], {
-    encoding: 'utf8',
-    cwd: worktreePath,
-  }).trim();
-}
-
-function formatBranch(branch: string | null): string {
-  if (!branch) return 'detached';
+function formatBranch(row: Pick<WorktreeRow, 'branch' | 'head'>): string {
+  const { branch, head } = row;
+  if (!branch) return head ? `detached at ${head.slice(0, 7)}` : 'detached';
   if (branch.startsWith('refs/heads/')) return branch.slice('refs/heads/'.length);
   return branch;
 }
@@ -61,7 +50,11 @@ function removeWorktrees(paths: string[], cwd: string, force: boolean): void {
   }
 }
 
-type Action = 'selected' | 'all' | 'exit';
+function pruneWorktrees(cwd: string): void {
+  execFileSync('git', ['worktree', 'prune', '--verbose'], { stdio: 'inherit', cwd });
+}
+
+type Action = 'selected' | 'all' | 'prune' | 'exit';
 
 async function main(): Promise<void> {
   const force = readArgForce(process.argv.slice(2));
@@ -77,43 +70,72 @@ async function main(): Promise<void> {
   }
 
   const commonDir = gitCommonDir(topLevel);
-  const parsed = parseWorktreePorcelain(gitWorktreePorcelain(topLevel));
+  const rows = loadWorktreeRows({ cwd: topLevel });
 
-  const rows = parsed.map((row) => {
-    const gitDir = gitDirForWorktree(row.path);
-    return {
-      ...row,
-      gitDir,
-      isLinked: isLinkedWorktreeGitDir(gitDir),
-    };
-  });
-
-  console.log(`Common git dir: ${commonDir}`);
-  console.log(`Current checkout: ${topLevel}\n`);
+  console.log(`Common git dir: ${printable(commonDir)}`);
+  console.log(`Current checkout: ${printable(topLevel)}\n`);
   console.log('Worktrees:');
   for (const row of rows) {
-    const label = row.isLinked ? 'linked' : 'primary';
-    console.log(`  [${label}] ${row.path}`);
-    console.log(`          ${formatBranch(row.branch)}`);
+    console.log(`  [${row.kind}] ${printable(row.path)}`);
+    console.log(`          ${printable(formatBranch(row))}`);
+    if (row.prunable) console.log(`          ${printable(row.prunable)}`);
+    if (row.locked) {
+      console.log(`          locked: ${printable(row.locked)}. Run \`git worktree unlock\` on it to make it removable.`);
+    }
   }
   console.log('');
 
-  const linked = rows.filter((r) => r.isLinked);
-  if (linked.length === 0) {
+  const linked = rows.filter((r) => r.kind === 'linked');
+  const prunable = rows.filter((r) => r.kind === 'prunable');
+  if (linked.length === 0 && prunable.length === 0) {
     console.log('No linked worktrees to remove.');
     return;
   }
 
-  const action = await select<Action>({
-    message: 'What do you want to do?',
-    choices: [
+  const choices: { name: string; value: Action }[] = [];
+  if (linked.length > 0) {
+    choices.push(
       { name: 'Remove selected linked worktrees', value: 'selected' },
       { name: `Remove all linked worktrees (${linked.length})`, value: 'all' },
-      { name: 'Exit', value: 'exit' },
-    ],
-  });
+    );
+  }
+  if (prunable.length > 0) {
+    choices.push({
+      name: `Prune stale worktree records (${prunable.length})`,
+      value: 'prune',
+    });
+  }
+  choices.push({ name: 'Exit', value: 'exit' });
+
+  const action = await select<Action>({ message: 'What do you want to do?', choices });
 
   if (action === 'exit') return;
+
+  if (action === 'prune') {
+    console.log('Git will forget these worktrees. Prune never deletes folders:');
+    for (const row of prunable) console.log(`  ${printable(row.path)} (${printable(formatBranch(row))})`);
+    if (prunable.some((r) => !r.branch)) {
+      console.log(
+        '\nA detached worktree\'s commit may not be on any branch, and Git can garbage-collect it after pruning.' +
+          '\nTo keep one, run `git branch <name> <commit>` first.',
+      );
+    }
+    console.log('');
+
+    const okPrune = await confirm({
+      message: `Prune ${prunable.length} stale worktree record(s)?`,
+      default: false,
+    });
+
+    if (!okPrune) {
+      console.log('Cancelled.');
+      return;
+    }
+
+    pruneWorktrees(topLevel);
+    console.log('Done.');
+    return;
+  }
 
   let targets: string[] = [];
   if (action === 'all') targets = linked.map((r) => r.path);
@@ -121,7 +143,7 @@ async function main(): Promise<void> {
     const picked = await checkbox({
       message: 'Choose worktrees to remove',
       choices: linked.map((r) => ({
-        name: `${r.path} (${formatBranch(r.branch)})`,
+        name: `${printable(r.path)} (${printable(formatBranch(r))})`,
         value: r.path,
       })),
       required: true,
@@ -138,8 +160,8 @@ async function main(): Promise<void> {
   if (dirtyWorktrees.length > 0) {
     console.log('These worktrees have local changes that would be deleted:');
     for (const worktree of dirtyWorktrees) {
-      console.log(`\n${worktree.path}`);
-      for (const change of worktree.changes) console.log(`  ${change}`);
+      console.log(`\n${printable(worktree.path)}`);
+      for (const change of worktree.changes) console.log(`  ${printable(change)}`);
     }
     console.log('');
 
@@ -154,10 +176,30 @@ async function main(): Promise<void> {
     }
   }
 
+  const envWorktrees = listIgnoredEnvFiles({ paths: targets });
+  if (envWorktrees.length > 0) {
+    console.log('These worktrees have ignored env files that git deletes along with the worktree:');
+    for (const worktree of envWorktrees) {
+      console.log(`\n${printable(worktree.path)}`);
+      for (const file of worktree.files) console.log(`  ${printable(file)}`);
+    }
+    console.log('');
+
+    const acceptEnvDelete = await confirm({
+      message: `Delete the env files shown above with ${envWorktrees.length} worktree(s)? Copy out anything you need first.`,
+      default: false,
+    });
+
+    if (!acceptEnvDelete) {
+      console.log('Cancelled.');
+      return;
+    }
+  }
+
   const shouldForce = force || dirtyWorktrees.length > 0;
   const forceNote = shouldForce ? 'with --force' : 'without --force';
   const ok = await confirm({
-    message: `Remove ${targets.length} worktree(s) ${forceNote}?\n${targets.join('\n')}`,
+    message: `Remove ${targets.length} worktree(s) ${forceNote}?\n${targets.map(printable).join('\n')}`,
     default: false,
   });
 

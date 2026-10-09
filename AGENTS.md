@@ -14,7 +14,14 @@ linked Git worktrees on Windows and macOS.
 - Never remove a real user's worktrees while testing. Integration tests create
   temporary repositories and clean them up.
 - Keep the primary checkout excluded from removal. Keep deletion confirmations,
-  including the extra confirmation for modified and untracked files.
+  including the extra confirmations for modified and untracked files and for
+  ignored env files, which `git worktree remove` deletes without asking.
+- Prunable worktrees (folder already gone) must never crash the listing. Don't
+  run git inside their path.
+- Locked worktrees are listed but never offered for removal, because
+  `git worktree remove` refuses them and would abort the rest of the batch.
+- Escape control characters with `printable` before printing any path or file
+  name that came from git, so a crafted name can't rewrite a warning.
 - The command must operate on the caller's current directory. Launchers may
   resolve their own path, but must not switch into this clone before running.
 
@@ -44,7 +51,11 @@ linked Git worktrees on Windows and macOS.
 
 - `index.ts`: inquirer prompts and worktree removal.
 - `parse-worktrees.ts`: porcelain parsing and linked checkout detection.
+- `worktree-rows.ts`: lists worktrees and labels them primary, linked, prunable
+  or unreadable.
 - `dirty-worktrees.ts`: modified and untracked file detection.
+- `ignored-env-files.ts`: ignored `.env*`, `*.env` and `.dev.vars*` file detection,
+  including inside ignored folders. Don't use `--directory`, which hides them.
 - `*.test.ts`: unit tests and disposable repository/installer integration tests.
 - `worktree-tidy` and `run.sh`: POSIX entry points.
 - `install.ps1`, `uninstall.ps1`, `deps.ps1`: Windows setup.
