@@ -7,13 +7,19 @@ import { join } from 'node:path';
 
 const tempDirs: string[] = [];
 
-/** Runs git with a fixed identity, so commits work on machines with no git config. */
+/**
+ * Runs git with a fixed identity and none of the machine's global or system config,
+ * so settings like commit.gpgsign can't make the tests prompt, hang or fail.
+ */
 export function runGit({ cwd, args }: { cwd: string; args: string[] }): string {
   return execFileSync('git', args, {
     cwd,
     encoding: 'utf8',
     env: {
       ...process.env,
+      // Git treats /dev/null as an empty file on every platform, Windows included.
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_NOSYSTEM: '1',
       GIT_AUTHOR_NAME: 'Test User',
       GIT_AUTHOR_EMAIL: 'test@example.com',
       GIT_COMMITTER_NAME: 'Test User',

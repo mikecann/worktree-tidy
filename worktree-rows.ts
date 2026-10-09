@@ -20,15 +20,14 @@ function gitWorktreePorcelain(cwd: string): string {
   });
 }
 
-function gitDirsForWorktree(worktreePath: string): { gitDir: string; commonDir: string } {
-  const [gitDir = '', commonDir = ''] = execFileSync(
-    'git',
-    ['rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir'],
-    { encoding: 'utf8', cwd: worktreePath, stdio: ['ignore', 'pipe', 'ignore'] },
-  )
-    .trim()
-    .split(/\r?\n/);
-  return { gitDir, commonDir };
+function gitPath(worktreePath: string, flag: '--git-dir' | '--git-common-dir'): string {
+  // One query per call, and only git's own line ending is removed, so a path that
+  // contains a newline still compares as a whole.
+  return execFileSync('git', ['rev-parse', '--path-format=absolute', flag], {
+    encoding: 'utf8',
+    cwd: worktreePath,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).replace(/\r?\n$/, '');
 }
 
 function classify(row: ParsedWorktree): WorktreeKind {
@@ -37,7 +36,9 @@ function classify(row: ParsedWorktree): WorktreeKind {
   // A locked worktree may sit on a drive that isn't mounted, so this check also comes before git runs.
   if (row.locked !== null) return 'locked';
   try {
-    return isLinkedWorktree(gitDirsForWorktree(row.path)) ? 'linked' : 'primary';
+    const gitDir = gitPath(row.path, '--git-dir');
+    const commonDir = gitPath(row.path, '--git-common-dir');
+    return isLinkedWorktree({ gitDir, commonDir }) ? 'linked' : 'primary';
   } catch {
     return 'unreadable';
   }

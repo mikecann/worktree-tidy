@@ -72,8 +72,8 @@ async function main(): Promise<void> {
   const commonDir = gitCommonDir(topLevel);
   const rows = loadWorktreeRows({ cwd: topLevel });
 
-  console.log(`Common git dir: ${commonDir}`);
-  console.log(`Current checkout: ${topLevel}\n`);
+  console.log(`Common git dir: ${printable(commonDir)}`);
+  console.log(`Current checkout: ${printable(topLevel)}\n`);
   console.log('Worktrees:');
   for (const row of rows) {
     console.log(`  [${row.kind}] ${printable(row.path)}`);

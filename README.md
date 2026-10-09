@@ -79,7 +79,7 @@ There is no non-interactive batch mode. To run without installing a command, fir
 | Step | Detail |
 |---|---|
 | Detect repo | Uses `git rev-parse --show-toplevel` from your current directory. Any subfolder inside a checkout is fine. |
-| List | Reads `git worktree list --porcelain` and labels checkouts as primary, linked, locked or prunable. A linked checkout has its own Git directory inside the repo's shared one, so this works with `--separate-git-dir` repos too. Prunable ones are records whose folder, or the folder's `.git` file, is already gone. |
+| List | Reads `git worktree list --porcelain` and labels checkouts as primary, linked, locked, prunable or unreadable. A linked checkout has its own Git directory inside the repo's shared one, so this works with `--separate-git-dir` repos too. Prunable ones are records whose folder, or the folder's `.git` file, is already gone. Unreadable ones are any other checkout Git can't open. |
 | Remove | Only linked worktrees are selectable. Locked ones are listed with their reason but left alone, because Git refuses to remove them. Run `git worktree unlock` first if you want one gone. Removals run `git worktree remove`. |
 | Prune | Offered when Git reports prunable worktrees. Runs `git worktree prune`, which only drops Git's own records and never deletes folders. |
 | Confirm | Shows local changes and ignored env files, asks before deleting them, then asks for final confirmation. Pruning asks too. Confirmed dirty worktrees are removed with `--force`. |
